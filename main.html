@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Xesoid WMS - Master Analytics Dashboard</title>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <!-- External CSS - Link to your style.css file -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Firebase SDKs (modular) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        
+        // Make Firebase available for any inline needs
+        window.firebaseModules = { initializeApp, getDatabase, ref, onValue };
+    </script>
+
+</head>
+<body>
+    <div class="main">
+        <div class="navbar">
+            <div class="icon">
+                <h2 class="logo">Xesoid WMS</h2>
+            </div>
+            <div class="menu">
+                <ul>
+                    <li><a href="track.html">SEARCH</a></li>
+                    <li><a href="credit.html">CREDIT'S</a></li>
+                    <li><a href="order.html">ADD ORDER'S</a></li>
+                    <li><a href="request.html">REQUEST</a></li>
+                    <li><a href="booking.html">BOOKING</a></li>
+                    <li><a href="tasks.html">TASKS</a></li>
+                    <li><a href="market-vehicle.html">VEHICLE/DRIVER</a></li>
+                    <li><a href="wms-execute.html">EXECUTE</a></li>
+                    <li><a href="deliveries.html">DELIVERY</a></li>
+                    <li><a href="services.html">SERVICE ORDER</a></li>
+                    <li><a href="invoices.html">INVOICE</a></li>
+                    <li><a href="analytics.html">ANALYTICS</a></li>
+                    <li><a href="reports.html">REPORTS</a></li>
+                    <li><a href="settings.html">SETTING</a></li>
+                    <li id="adminSetupNav"><a href="setup.html">SETTINGS</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="content">
+            <h1>Sales <span>Performance</span></h1>
+        </div>
+
+        <div class="cards">
+            <div class="card">
+                <h2>Total Revenue</h2>
+                <div class="live-counter" id="totalRevenue">₹0.00</div>
+            </div>
+
+            <div class="card recent-card">
+                <h2>Recent Order</h2>
+                <div id="recentItemBox">
+                    <div class="recent-title" id="recentBillId">Loading...</div>
+                    <div class="recent-meta">Amount: <span id="recentAmount">--</span></div>
+                    <div class="recent-meta">Status: <span id="recentStatus">--</span></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <h3>Revenue Action & Manifest Volume</h3>
+            <canvas id="salesChart"></canvas>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBffzzeiU6mwm2mg1QzcXvXRs1XP1ikk-4",
+            authDomain: "xesoid-wms.firebaseapp.com",
+            databaseURL: "https://xesoid-wms-default-rtdb.firebaseio.com/",
+            projectId: "xesoid-wms"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // DOM Elements
+        const totalRevenueBox = document.getElementById('totalRevenue');
+        const recentBillIdBox = document.getElementById('recentBillId');
+        const recentAmountBox = document.getElementById('recentAmount');
+        const recentStatusBox = document.getElementById('recentStatus');
+
+        // Initialize Chart
+        const ctx = document.getElementById('salesChart').getContext('2d');
+        const salesChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Quoted Revenue (₹)',
+                    data: [],
+                    borderColor: '#ff7300',
+                    backgroundColor: 'rgba(255, 115, 0, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { labels: { color: '#fff' } }
+                },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa' } },
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#aaa' } }
+                }
+            }
+        });
+
+        // Firebase Data Fetch
+        const requestsRef = ref(db, 'customer_requests');
+        onValue(requestsRef, (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                let totalRevenue = 0;
+                let chartLabels = [];
+                let chartDataPoints = [];
+
+                const records = Object.entries(data);
+
+                records.forEach(([key, order]) => {
+                    const billAmount = Number(order.total_quotation || 0);
+                    totalRevenue += billAmount;
+                    chartLabels.push(order.tracking_code || 'Order');
+                    chartDataPoints.push(billAmount);
+                });
+
+                // Update Total Revenue
+                totalRevenueBox.innerText = `₹${totalRevenue.toFixed(2)}`;
+
+                // Display Recent Order (last entry)
+                if (records.length > 0) {
+                    const [lastId, lastOrder] = records[records.length - 1];
+                    recentBillIdBox.innerText = `Manifest: ${lastOrder.tracking_code || 'N/A'}`;
+                    recentAmountBox.innerText = `₹${Number(lastOrder.total_quotation || 0).toFixed(2)}`;
+                    recentStatusBox.innerText = lastOrder.status || "Pending Officer Review";
+                }
+
+                // Update Chart
+                salesChart.data.labels = chartLabels;
+                salesChart.data.datasets[0].data = chartDataPoints;
+                salesChart.update();
+            } else {
+                totalRevenueBox.innerText = "₹0.00";
+                recentBillIdBox.innerText = "No Freight Records Found";
+                recentAmountBox.innerText = "--";
+                recentStatusBox.innerText = "--";
+            }
+        });
+
+        // Admin Role Visibility Check
+        if (localStorage.getItem("userRole") !== "admin") {
+            const setupNavOption = document.getElementById("adminSetupNav");
+            if (setupNavOption) setupNavOption.style.display = "none";
+        }
+    </script>
+</body>
+</html>
